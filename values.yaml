@@ -1,0 +1,142 @@
+# namespace:
+# - monitoring
+replicaCount: 1
+
+service:
+  type: ClusterIP
+  port: 80
+
+ingress:
+  enabled: false
+  annotations: {}
+  hosts:
+    - host: chart-example.local
+      paths: []
+  tls: []
+
+resources: {}
+
+autoscaling:
+  enabled: false
+  minReplicas: 1
+  maxReplicas: 100
+  targetCPUUtilizationPercentage: 80
+
+
+# Values: Elastic Search
+
+elasticsearch:
+
+  replicas: 1
+  minimumMasterNodes: 1
+  clusterHealthCheckParams: "wait_for_status=green&timeout=60s"
+  esJavaOpts: "-Xmx1g -Xms1g"
+
+  resources:
+    requests:
+      cpu: "550m"
+      memory: "1Gi"
+    limits:
+      cpu: "1000m"
+      memory: "2Gi"
+
+  podManagementPolicy: "Parallel"
+
+  # This is the max unavailable setting for the pod disruption budget
+  # The default value of 1 will make sure that kubernetes won't allow more than 1
+  # of your pods to be unavailable during maintenance
+  maxUnavailable: 1
+
+  readinessProbe:
+    initialDelaySeconds: 15
+    periodSeconds: 10
+    timeoutSeconds: 5
+    successThreshold: 1
+    failureThreshold: 3
+
+# Values: Kibana
+
+kibana:
+
+  replicas: 1
+
+  elasticsearchHosts: "http://elasticsearch-master:9200"
+
+  resources:
+    requests:
+      cpu: "550m"
+      memory: "1Gi"
+    limits:
+      cpu: "1000m"
+      memory: "2Gi"
+
+  updateStrategy:
+    type: "RollingUpdate"
+
+  readinessProbe:
+    initialDelaySeconds: 15
+    periodSeconds: 10
+    timeoutSeconds: 5
+    successThreshold: 1
+    failureThreshold: 3
+
+    
+# Values: Fluentd 
+
+fluentd-elasticsearch:
+  elasticsearch:
+    hosts: ["esinfra-master:9200"]
+    host: 'esinfra-master'
+    port: 9200
+
+# Values: Prometheus
+
+prometheus:
+  server:
+    port: 5601
+    global:
+      scrape_interval:     15s
+      evaluation_interval: 15s
+      scrape_timeout: 10s
+
+  
+  serverFiles:
+
+    prometheus.yml:
+      rule_files:
+        - /etc/config/recording_rules.yml
+        - /etc/config/alerting_rules.yml
+      ## Below two files are DEPRECATED will be removed from this default values file
+        - /etc/config/rules
+        - /etc/config/alerts
+
+      scrape_configs:
+        - job_name: webapp
+          scrape_interval: 10s
+          scrape_timeout: 10s
+          honor_labels: true
+          metrics_path: /actuator/prometheus
+          static_configs:
+            - targets: ['app-csye7125:8080'] 
+
+        - job_name: eexporter          
+          scrape_interval: 10s
+          scrape_timeout: 10s  
+          honor_labels: true
+          static_configs:
+            - targets: ['infra-prometheus-elasticsearch-exporter:9108']
+
+        - job_name: kafka-exporter
+          scrape_interval: 10s
+          scrape_timeout: 10s  
+          honor_labels: true
+          static_configs:
+            - targets: ['infra-kafka-exporter:9308']
+            
+        - job_name: jmx-exporter          
+          scrape_interval: 10s
+          scrape_timeout: 10s  
+          honor_labels: true
+          static_configs:
+            - targets: ['infra-kafka:5555']             
+                        
